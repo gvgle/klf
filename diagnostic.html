@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KLF Diagnostic Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+        }
+        .pass { color: #00ff00; }
+        .fail { color: #ff0000; }
+        .info { color: #ffaa00; }
+        #app-frame {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #00ff00;
+            margin-top: 20px;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 KLF 白屏诊断工具</h1>
+
+    <div class="test-section">
+        <h2>1. 服务器连接测试</h2>
+        <p id="server-test">⏳ 测试中...</p>
+        <button onclick="testServer()">重新测试</button>
+    </div>
+
+    <div class="test-section">
+        <h2>2. React 应用加载测试</h2>
+        <p id="react-test">⏳ 测试中...</p>
+        <button onclick="testReact()">重新测试</button>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 控制台错误检测</h2>
+        <p id="console-errors">⏳ 监听中...</p>
+        <pre id="error-log" style="background: #000; padding: 10px; max-height: 200px; overflow: auto;"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 应用预览 (iframe)</h2>
+        <button onclick="loadApp()">加载应用</button>
+        <button onclick="reloadApp()">重新加载</button>
+        <iframe id="app-frame" src="about:blank"></iframe>
+    </div>
+
+    <script>
+        const errorLog = [];
+
+        // Capture console errors
+        window.addEventListener('error', (e) => {
+            const msg = `[ERROR] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`;
+            errorLog.push(msg);
+            updateErrorLog();
+        });
+
+        function updateErrorLog() {
+            const el = document.getElementById('error-log');
+            if (errorLog.length === 0) {
+                el.textContent = '✓ 没有检测到错误';
+                document.getElementById('console-errors').innerHTML = '<span class="pass">✓ 没有 JavaScript 错误</span>';
+            } else {
+                el.textContent = errorLog.join('\n');
+                document.getElementById('console-errors').innerHTML = `<span class="fail">✗ 检测到 ${errorLog.length} 个错误</span>`;
+            }
+        }
+
+        async function testServer() {
+            const el = document.getElementById('server-test');
+            el.innerHTML = '<span class="info">⏳ 连接中...</span>';
+
+            try {
+                const response = await fetch('http://localhost:3000/');
+                if (response.ok) {
+                    const html = await response.text();
+                    if (html.includes('id="root"')) {
+                        el.innerHTML = '<span class="pass">✓ 服务器正常运行，HTML 结构正确</span>';
+                    } else {
+                        el.innerHTML = '<span class="fail">✗ HTML 结构异常</span>';
+                    }
+                } else {
+                    el.innerHTML = `<span class="fail">✗ 服务器响应错误: ${response.status}</span>`;
+                }
+            } catch (e) {
+                el.innerHTML = `<span class="fail">✗ 无法连接到服务器: ${e.message}</span>`;
+            }
+        }
+
+        async function testReact() {
+            const el = document.getElementById('react-test');
+            el.innerHTML = '<span class="info">⏳ 测试中...</span>';
+
+            try {
+                const response = await fetch('http://localhost:3000/src/main.tsx');
+                if (response.ok) {
+                    el.innerHTML = '<span class="pass">✓ React 入口文件可访问</span>';
+                } else {
+                    el.innerHTML = '<span class="fail">✗ React 入口文件无法访问</span>';
+                }
+            } catch (e) {
+                el.innerHTML = `<span class="fail">✗ 错误: ${e.message}</span>`;
+            }
+        }
+
+        function loadApp() {
+            const iframe = document.getElementById('app-frame');
+            iframe.src = 'http://localhost:3000/';
+
+            // Monitor iframe for errors
+            iframe.onload = () => {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const root = iframeDoc.getElementById('root');
+
+                    setTimeout(() => {
+                        if (root && root.children.length > 0) {
+                            console.log('✓ React 应用已渲染');
+                        } else {
+                            console.log('✗ React 应用未渲染 (root 为空)');
+                        }
+                    }, 2000);
+                } catch (e) {
+                    console.log('无法访问 iframe 内容 (CORS 限制)');
+                }
+            };
+        }
+
+        function reloadApp() {
+            const iframe = document.getElementById('app-frame');
+            iframe.src = iframe.src;
+        }
+
+        // Auto-run tests on load
+        window.onload = () => {
+            testServer();
+            testReact();
+            updateErrorLog();
+        };
+    </script>
+</body>
+</html>
